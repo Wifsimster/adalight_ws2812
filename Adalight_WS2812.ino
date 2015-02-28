@@ -1,49 +1,92 @@
+//////////
+//
+// Arduino interface for the use of ws2812 operated LEDs
+// Uses Adalight protocol and is compatible with Boblight, Prismatik etc
+// "Magic Word" for synchronisation is 'Ada' followed by LED High, Low and Checksum
+//
+//////////
+
 #include "FastLED.h"
 
-// How many leds in your strip?
-#define NUM_LEDS 34
+// Define the number of LEDs
+#define NUM_LEDS 240
 
-// For led chips like Neopixels, which have a data line, ground, and power, you just
-// need to define DATA_PIN.  For led chipsets that are SPI based (four wires - data, clock,
-// ground, and power), like the LPD8806, define both DATA_PIN and CLOCK_PIN
-#define DATA_PIN 1
-#define CLOCK_PIN 13
+// Define SPI Pin
+#define PIN 1
 
 // Baudrate, higher rate allows faster refresh rate and more LEDs (defined in /etc/boblight.conf)
 #define serialRate 115200
 
+// Utilises FastSPI_LED2
+#define FORCE_SOFTWARE_SPI
+#define FORCE_SOFTWARE_PINS
+
 // Adalight sends a "Magic Word" (defined in /etc/boblight.conf) before sending the pixel data
 uint8_t prefix[] = {'A', 'd', 'a'}, hi, lo, chk, i;
 
-// Define the array of leds
+// initialise LED-array
 CRGB leds[NUM_LEDS];
 
-void setup() { 
-	FastLED.addLeds<NEOPIXEL, DATA_PIN>(leds, NUM_LEDS);
+void setup()
+{
+  
+  FastLED.addLeds<WS2812, PIN, RGB>(leds, NUM_LEDS);
+  
+  // initial RGB flash
+  LEDS.showColor(CRGB(255, 0, 0));
+  delay(500);
+  LEDS.showColor(CRGB(0, 255, 0));
+  delay(500);
+  LEDS.showColor(CRGB(0, 0, 255));
+  delay(500);
+  LEDS.showColor(CRGB(0, 0, 0));
+  
+  Serial.begin(serialRate);
+  Serial.print("Ada\n"); // Send "Magic Word" string to host
+  
 }
 
 void loop() { 
-	// First slide the led in one direction
-	for(int i = 0; i < NUM_LEDS; i++) {
-		// Set the i'th led to red 
-		leds[i] = CRGB::Red;
-		// Show the leds
-		FastLED.show();
-		// now that we've shown the leds, reset the i'th led to black
-		leds[i] = CRGB::Black;
-		// Wait a little bit before we loop around and do it again
-		delay(30);
-	}
-
-	// Now go in the other direction.  
-	for(int i = NUM_LEDS-1; i >= 0; i--) {
-		// Set the i'th led to red 
-		leds[i] = CRGB::Red;
-		// Show the leds
-		FastLED.show();
-		// now that we've shown the leds, reset the i'th led to black
-		leds[i] = CRGB::Black;
-		// Wait a little bit before we loop around and do it again
-		delay(30);
-	}
+  // wait for first byte of Magic Word
+  for(i = 0; i < sizeof prefix; ++i) {
+    waitLoop: while (!Serial.available()) ;;
+    // Check next byte in Magic Word
+    if(prefix[i] == Serial.read()) continue;
+    // otherwise, start over
+    i = 0;
+    goto waitLoop;
+  }
+  
+  // Hi, Lo, Checksum
+  
+  while (!Serial.available()) ;;
+  hi=Serial.read();
+  while (!Serial.available()) ;;
+  lo=Serial.read();
+  while (!Serial.available()) ;;
+  chk=Serial.read();
+  
+  // if checksum does not match go back to wait
+  if (chk != (hi ^ lo ^ 0x55))
+  {
+    i=0;
+    goto waitLoop;
+  }
+  
+  memset(leds, 0, NUM_LEDS * sizeof(struct CRGB));
+  // read the transmission data and set LED values
+  for (uint8_t i = 0; i < NUM_LEDS; i++) {
+    byte r, g, b;    
+    while(!Serial.available());
+    r = Serial.read();
+    while(!Serial.available());
+    g = Serial.read();
+    while(!Serial.available());
+    b = Serial.read();
+    leds[i].r = r;
+    leds[i].g = g;
+    leds[i].b = b;
+  }
+  // shows new values
+ FastLED.show();
 }
