@@ -16,4 +16,4 @@ FastLED library can be found on Github here : https://github.com/FastLED/FastLED
 - Prismatik (Linux, Windows, Mac): https://github.com/psieg/Lightpack/releases
 
 ## The circuit
-![image](https://user-images.githubusercontent.com/57588282/112463052-12ffd680-8d62-11eb-84cc-00eae1426d71.png)
+![image](https://user-images.githubusercontent.com/57588282/112475769-76453500-8d71-11eb-9e01-6321eb142ff7.png)
